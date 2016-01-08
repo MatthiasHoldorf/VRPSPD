@@ -1,0 +1,14 @@
+dist: [0,5,6,7,
+       5,0,30,70,
+       6,30,0,40,
+       7,70,40,0]
+
+d: [(2) 4, 6, 5]
+
+p: [(2) 5, 4, 10]
+
+c: 20 !--big enough to do everything in a single tour/ with one vehicle
+
+n: 3
+
+v: 3 !--by reducing the number of vehicles from three to one the total distance gets longer each time
