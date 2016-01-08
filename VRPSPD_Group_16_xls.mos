@@ -1,0 +1,174 @@
+! ------------------------------------------------------------------
+
+model VRPSPD
+uses "mmxprs", "mmive", "mmsheet"; ! Gain access to the Xpress-Optimizer solver
+
+! ------------------------------------------------------------------
+
+declarations
+	! Sets
+	n: integer			! number of customers
+	v: integer   		! number of vehicles
+	N: set of integer	! set of nodes
+	C: set of integer	! set of customer
+	K: set of integer	! set of vehicles
+	
+	! Parameters
+	dist: array(N, N) of real	! distance matrix
+	d: array(N) of integer	    ! demand
+	p: array(N) of integer      ! pickup
+	c: integer			        ! capacity of a vehicle
+	
+	! Decision Variables
+	x: array(N, N) of mpvar	! indicator if a vehicle is driving from i to j
+	y: array(N) of mpvar	! y(i): amount of delivery commodities arriving at a customer i
+	z: array(N) of mpvar    ! z(i): amount of pickup commodities leaving a customer i
+	
+	!Helping parameter for getting a distance matrix from coordinates in a excel sheet
+	X: array(N) of integer	!x-position of customer
+	Y: array(N) of integer	!Y-position of customer
+end-declarations
+
+! ------------------------------------------------------------------
+
+(!
+initializations from "instance_3.dat"
+	n v
+end-initializations
+
+n := n
+N := 1..n+1
+C := 2..n+1
+K := 1..v
+
+initializations from "instance_3.dat"
+	dist d p c
+end-initializations
+!)
+
+! ------------------------------------------------------------------
+
+initializations from "mmsheet.excel:instance_maxbound.xlsx"
+	n as 'noindex;[Daten_10$C1]'
+	v as 'noindex;[Daten_10$H3]'
+end-initializations
+
+    n := n
+    N := 1..n+1
+    C := 2..n+1
+    K := 1..v
+
+initializations from "mmsheet.excel:instance_maxbound.xlsx"
+	X as 'noindex;[Daten_10$B5:B'+(5+n)+']'
+	Y as 'noindex;[Daten_10$C5:C'+(5+n)+']'
+	d as 'noindex;[Daten_10$D6:D'+(5+n)+']'
+	p as 'noindex;[Daten_10$E6:E'+(5+n)+']'
+	c as 'noindex;[Daten_10$H2]'
+end-initializations
+
+! ------------------------------------------------------------------
+
+! pre-processing
+forall(i, j in N) 
+	dist(i,j) := round(sqrt((X(i)-X(j))^2 +(Y(i)-Y(j))^2 )*100)/100
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.1]
+! Objective: minimize the distance needed to fullfil all customer requests.
+Length := sum(i,j in N | i<>j) dist(i,j) * x(i,j)
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.2]
+! Make sure that each customer is visited exactly once.
+forall(j in C) 
+  sum(i in N| i<>j) x(i,j) = 1
+forall(j in C) 
+  sum(i in N| j<>i) x(j,i) = 1
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.3]
+! Each vehicle in the fleet has to be used at most once. 
+! We handle each outgoing tour as one vehicle and therefore only allow as many outgoing tours as vehicles in the fleet exist.
+sum(j in C) x(1,j) <= v
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.4]
+! Make sure that a vehicle has not more than the maximum capacity loaded when leaving from a customer or the depot.
+forall(i,j in C) do
+    y(i) >= d(i) ! At each customer the remaining capacity of goods to deliver has to be at least as high as the demand of the customer.
+    z(i) >= p(i) ! At each customer the amount of picked up goods is at least as high as the pickup-request of the customer when the vehicle leaves this customer.
+    z(i) + y(i) - d(i) <= c ! The pickup at a customer takes place after the commodities are delivered; as y(i) represents the the capacitiy of commodity goods when reaching customer i it has to be reduced by the demand d(i) it will drop off at that customer.
+end-do
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.5]
+! Counting the amount of commodities that were already picked up when visiting a certain customer i.
+forall(i in C) 
+  z(i) <= c + (p(i) - c) * x(1,i) ! The amount of pickup commodities at a customer i that is visited directly after the depot (first customer of a tour) is the requested pickup p(i) of this customer.
+
+forall(i,j in C| i<>j) 
+  z(j) >= z(i) + p(j) - c + c * x(i,j) + (c - p(j) - p(i)) * x(j,i) ! accumulating the pickups during a tour.
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.6]
+! Keeping track of the amount of commodities to deliver that are stored in a vehicle when reaching customer i.
+forall(i,j in N)
+  y(i) - y(j) <= c - (c - d(i)) * x(i,j) ! The difference between y(i) and y(j) is the demand d(i) that was delivered at customer i.
+  
+forall(i,j in C| i<>j) 
+  y(i) >= y(j) + d(i) - c + c * x(i,j) ! The difference between y(i) and y(j) is the demand d(i) that was delivered at customer i.
+  
+forall(i in C) 
+  y(i) <= c - (c - d(i))* x(i,1) ! The amount of commodities to deliver that are stored in a vehicle at the last customer of the tour is this cutomers demand.
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.7]
+! The flow decision variables need to be greater than 0.
+forall(i in N) do
+  y(i) >= 0
+  z(i) >= 0
+end-do
+
+! ------------------------------------------------------------------
+
+! [Constraint 6.8]
+! Decision variable x needs to be binary.
+forall(i,j in N) x(i,j) is_binary
+
+! ------------------------------------------------------------------
+
+! [Solution]
+! Solve the problem.
+minimize(Length)
+
+! ------------------------------------------------------------------
+
+! [Print]
+! Printing the solution.
+writeln("Total distance: ", getobjval)
+
+ writeln("Total distance: ", getobjval)
+ forall(i in C)
+  if(getsol(x(1,i)) > 0) then
+   ct := 0
+   writeln(1, " -> ", i)
+   fromNode := i
+   while(fromNode <> 1) do
+    l := integer(round(sum(j in N) j*getsol(x(fromNode,j))))
+    writeln(fromNode, " -> ", l)
+    if(l <> 0) then 
+    	ct+=1
+    end-if
+    fromNode := l
+   end-do
+   writeln("Visited customers: ", ct)
+  end-if
+  
+  ! ------------------------------------------------------------------
