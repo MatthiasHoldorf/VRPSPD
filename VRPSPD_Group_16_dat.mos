@@ -42,13 +42,13 @@ end-initializations
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.1]
+! [Constraint 1.1]
 ! Objective: minimize the distance needed to fullfil all customer requests.
 Length := sum(i,j in N | i<>j) dist(i,j) * x(i,j)
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.2]
+! [Constraint 1.2]
 ! Make sure that each customer is visited exactly once.
 forall(j in C) 
   sum(i in N| i<>j) x(i,j) = 1
@@ -57,14 +57,14 @@ forall(j in C)
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.3]
+! [Constraint 1.3]
 ! Each vehicle in the fleet has to be used at most once. 
 ! We handle each outgoing tour as one vehicle and therefore only allow as many outgoing tours as vehicles in the fleet exist.
 sum(j in C) x(1,j) <= v
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.4]
+! [Constraint 1.4]
 ! Make sure that a vehicle has not more than the maximum capacity loaded when leaving from a customer or the depot.
 forall(i,j in C) do
     y(i) >= d(i) ! At each customer the remaining capacity of goods to deliver has to be at least as high as the demand of the customer.
@@ -74,7 +74,7 @@ end-do
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.5]
+! [Constraint 1.5]
 ! Counting the amount of commodities that were already picked up when visiting a certain customer i.
 forall(i in C) 
   z(i) <= c + (p(i) - c) * x(1,i) ! The amount of pickup commodities at a customer i that is visited directly after the depot (first customer of a tour) is the requested pickup p(i) of this customer.
@@ -84,7 +84,7 @@ forall(i,j in C| i<>j)
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.6]
+! [Constraint 1.6]
 ! Keeping track of the amount of commodities to deliver that are stored in a vehicle when reaching customer i.
 forall(i,j in N)
   y(i) - y(j) <= c - (c - d(i)) * x(i,j) ! The difference between y(i) and y(j) is the demand d(i) that was delivered at customer i.
@@ -97,7 +97,7 @@ forall(i in C)
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.7]
+! [Constraint 1.7]
 ! The flow decision variables need to be greater than 0.
 forall(i in N) do
   y(i) >= 0
@@ -106,7 +106,7 @@ end-do
 
 ! ------------------------------------------------------------------
 
-! [Constraint 6.8]
+! [Constraint 1.8]
 ! Decision variable x needs to be binary.
 forall(i,j in N) x(i,j) is_binary
 
